@@ -1,5 +1,5 @@
 {
-	"name": "trackpoint/data-query-interface",
+	"name": "eduard-gr/data-query-interface",
 	"description": "Library for relation between API interfaces",
 	"type": "library",
 	"require": {
