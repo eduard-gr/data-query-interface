@@ -2,6 +2,7 @@
 
 namespace Trackpoint\DataQueryInterface\Statement;
 
+use Ds\Set;
 use Generator;
 use Trackpoint\DataQueryInterface\Expression\Condition;
 use Trackpoint\DataQueryInterface\InterfaceFeature;

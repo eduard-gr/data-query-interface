@@ -14,7 +14,9 @@ use Trackpoint\DataQueryInterface\Metadata\AttributeMetadata;
 use Psr\Log\LoggerInterface;
 
 use Ds\Deque;
+use Ds\Map;
 use Ds\Queue;
+use Exception;
 
 class InsertPlaner implements PlanerInterface
 {
@@ -32,6 +34,13 @@ class InsertPlaner implements PlanerInterface
 	{
 		$priority = new Deque([$feature]);
 		$processing = new Queue([$feature]);
+
+		/**
+		 * Для каждой фичи, стоящей на стороне FOREIGN, запоминаем имя ключа,
+		 * который она должна получить из уже вставленного родителя.
+		 * Это и есть relation key для InsertJoin.
+		 */
+		$joins = new Map();
 
 		while ($processing->isEmpty() == false) {
 			$feature = $processing->pop();
@@ -52,21 +61,23 @@ class InsertPlaner implements PlanerInterface
 				$join = $relation->getJoin();
 
 				switch ($feature->getMetadata()->getAttribute($join)->getConstrain()) {
-					case AttributeMetadata::PRIMARY_CONSTRAINT:
+					case AttributeMetadata::PRIMARY:
 						$feature->getReturning()->add($join);
 						break;
-					case AttributeMetadata::FOREIGN_CONSTRAINT:
+					case AttributeMetadata::FOREIGN:
 						$feature->getData()->put($join, null);
+						$joins->put($feature, $join);
 						break;
 				}
 
 				switch ($related->getMetadata()->getAttribute($join)->getConstrain()) {
-					case AttributeMetadata::PRIMARY_CONSTRAINT:
+					case AttributeMetadata::PRIMARY:
 						$related->getReturning()->add($join);
 						$priority->unshift($related);
 						break;
-					case AttributeMetadata::FOREIGN_CONSTRAINT:
+					case AttributeMetadata::FOREIGN:
 						$related->getData()->put($join, null);
+						$joins->put($related, $join);
 						$priority->push($related);
 						break;
 				}
@@ -76,12 +87,23 @@ class InsertPlaner implements PlanerInterface
 		$head = new InsertStatement($this->resolver, $priority->shift());
 
 		while ($priority->isEmpty() == false) {
+			$related = $priority->shift();
+
+			$join = $joins->get($related, null);
+			if ($join === null) {
+				throw new Exception(sprintf(
+					'Interface "%s" has no foreign key to join inserted data on',
+					$related->getName()
+				));
+			}
+
 			$head = new InsertJoin(
 				new InsertStatement(
 					$this->resolver,
-					$priority->shift()
+					$related
 				),
-				$head
+				$head,
+				$join
 			);
 		}
 
