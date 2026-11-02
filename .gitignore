@@ -3,5 +3,5 @@
 .vscode
 .idea
 /Test/*
-
+CLAUDE.md
 composer.lock
